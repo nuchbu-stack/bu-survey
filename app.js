@@ -30,6 +30,7 @@ function createQuestionElement(q) {
   wrap.className = 'question';
   wrap.dataset.qid = q.id;
   wrap.dataset.sectionId = q.sectionId;
+  // เก็บสถานะที่ต้องแสดง แยกด้วย , เช่น "STU,STAFF_BU"
   wrap.dataset.showForStatus = (q.showForStatus || []).join(',');
 
   const labelDiv = document.createElement('div');
@@ -52,7 +53,7 @@ function createQuestionElement(q) {
 
   let controlEl = null;
 
-  // radio & scale
+  // ---------- radio & scale ----------
   if (q.type === 'radio' || q.type === 'scale') {
     const group = document.createElement('div');
     group.className = 'option-group';
@@ -90,6 +91,23 @@ function createQuestionElement(q) {
       input.value = opt.value;
       if (q.required) input.required = true;
 
+      // ✅ ถ้าเป็นคำถาม status ให้ผูก event เพื่ออัปเดต state.status + visibility
+      if (q.id === 'status') {
+        input.addEventListener('change', e => {
+          state.status = e.target.value || null;
+
+          // ถ้าไม่ใช่นักศึกษาแล้ว ล้างค่า/ตัวเลือกคณะ+สาขา
+          if (state.status !== 'STU') {
+            state.facultyId = null;
+            const facSel = document.querySelector('select[name="faculty_id"]');
+            if (facSel) facSel.value = '';
+            updateProgramOptions();
+          }
+
+          updateVisibilityByStatus();
+        });
+      }
+
       optDiv.appendChild(input);
       optDiv.appendChild(
         document.createTextNode(tLabel(opt.label) || opt.value)
@@ -99,7 +117,7 @@ function createQuestionElement(q) {
 
     controlEl = group;
 
-  // checkbox
+  // ---------- checkbox ----------
   } else if (q.type === 'checkbox') {
     const group = document.createElement('div');
     group.className = 'option-group';
@@ -122,7 +140,7 @@ function createQuestionElement(q) {
 
     controlEl = group;
 
-  // select
+  // ---------- select ----------
   } else if (q.type === 'select') {
     const select = document.createElement('select');
     select.name = q.id;
@@ -133,20 +151,7 @@ function createQuestionElement(q) {
       currentLang === 'en' ? '-- Please select --' : '-- โปรดเลือก --';
     select.appendChild(placeholder);
 
-    if (q.id === 'status') {
-      // สถานะผู้ตอบ
-      (q.options || []).forEach(opt => {
-        const op = document.createElement('option');
-        op.value = opt.value;
-        op.textContent = tLabel(opt.label) || opt.value;
-        select.appendChild(op);
-      });
-      select.addEventListener('change', e => {
-        state.status = e.target.value || null;
-        updateVisibilityByStatus();
-      });
-
-    } else if (q.id === 'faculty_id') {
+    if (q.id === 'faculty_id') {
       // คณะ
       (CONFIG.lookups.faculties || []).forEach(f => {
         const op = document.createElement('option');
@@ -184,7 +189,7 @@ function createQuestionElement(q) {
 
     controlEl = select;
 
-  // text
+  // ---------- text ----------
   } else if (q.type === 'text') {
     const input = document.createElement('input');
     input.type = 'text';
@@ -192,7 +197,7 @@ function createQuestionElement(q) {
     if (q.required) input.required = true;
     controlEl = input;
 
-  // textarea
+  // ---------- textarea ----------
   } else if (q.type === 'textarea') {
     const ta = document.createElement('textarea');
     ta.name = q.id;
@@ -212,10 +217,15 @@ function createQuestionElement(q) {
   return wrap;
 }
 
+
 // ---------- render form ----------
 function renderForm() {
   const container = document.getElementById('sectionsContainer');
   container.innerHTML = '';
+
+  // รีเซ็ต state ทุกครั้งที่วาดใหม่
+  state.status = null;
+  state.facultyId = null;
 
   CONFIG.sections.forEach(sec => {
     const secDiv = document.createElement('div');
@@ -242,9 +252,16 @@ function renderForm() {
     container.appendChild(secDiv);
   });
 
+  // ถ้ามี status ถูกเลือกอยู่ (กรณีอนาคตตั้ง default) ให้ sync เข้า state
+  const checkedStatus = document.querySelector('input[name="status"]:checked');
+  if (checkedStatus) {
+    state.status = checkedStatus.value || null;
+  }
+
   updateProgramOptions();
   updateVisibilityByStatus();
 }
+
 
 // ---------- visibility ตาม status ----------
 function updateVisibilityByStatus() {
