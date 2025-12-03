@@ -371,17 +371,22 @@ async function submitForm(e) {
   statusText.className = 'status-msg';
 
   const data = collectAnswers();
+
   btn.disabled = true;
   btn.textContent = currentLang === 'en' ? 'Submitting...' : 'กำลังส่ง...';
 
   try {
+    // ส่งแบบ application/x-www-form-urlencoded เพื่อหลบ preflight
+    const body = 'payload=' + encodeURIComponent(JSON.stringify(data));
+
     const res = await fetch(API_BASE + '?act=submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      },
+      body
     });
 
-    // ถ้า Apps Script ตอบ HTML error มา จะไม่ใช่ JSON → ลอง parse แบบปกติ
     let json;
     try {
       json = await res.json();
@@ -394,7 +399,6 @@ async function submitForm(e) {
     console.log('Submit response:', json);
 
     if (!json.ok) {
-      // backend ส่ง error message มาเอง
       throw new Error(json.error || 'Unknown error from server');
     }
 
@@ -412,12 +416,10 @@ async function submitForm(e) {
 
   } catch (err) {
     console.error('Submit error:', err);
-
-    // โชว์ error จริงจาก backend ไว้ช่วย debug ชั่วคราว
-    const msgTh = 'เกิดข้อผิดพลาดในการส่งแบบประเมิน: ' + (err.message || '');
+    const msgTh =
+      'เกิดข้อผิดพลาดในการส่งแบบประเมิน: ' + (err.message || '');
     const msgEn = 'Error while submitting: ' + (err.message || '');
     statusText.textContent = currentLang === 'en' ? msgEn : msgTh;
-
     statusText.classList.add('status-error');
   } finally {
     btn.disabled = false;
@@ -427,6 +429,7 @@ async function submitForm(e) {
         : 'ส่งแบบประเมิน / Submit';
   }
 }
+
 
 
 // ---------- โหลด CONFIG จาก Apps Script ----------
