@@ -30,7 +30,7 @@ function createQuestionElement(q) {
   wrap.className = 'question';
   wrap.dataset.qid = q.id;
   wrap.dataset.sectionId = q.sectionId;
-  // เก็บสถานะที่ต้องแสดง แยกด้วย , เช่น "STU,STAFF_BU"
+  // เก็บ status ที่ต้องแสดง แยกด้วย , เช่น "STU,STAFF_BU"
   wrap.dataset.showForStatus = (q.showForStatus || []).join(',');
 
   const labelDiv = document.createElement('div');
@@ -91,12 +91,19 @@ function createQuestionElement(q) {
       input.value = opt.value;
       if (q.required) input.required = true;
 
-      // ✅ ถ้าเป็นคำถาม status ให้ผูก event เพื่ออัปเดต state.status + visibility
+      // เช็คว่า option นี้คือ "อื่น ๆ" หรือไม่
+      const labelText = tLabel(opt.label) || '';
+      const isOtherOpt =
+        (opt.value && opt.value.toLowerCase() === 'other') ||
+        labelText === 'อื่น ๆ' ||
+        labelText.toLowerCase() === 'other';
+
+      // ถ้าเป็นคำถามสถานะ ให้ผูก event อัปเดต state.status + visibility
       if (q.id === 'status') {
         input.addEventListener('change', e => {
           state.status = e.target.value || null;
 
-          // ถ้าไม่ใช่นักศึกษาแล้ว ล้างค่า/ตัวเลือกคณะ+สาขา
+          // ถ้าไม่ได้เป็นนักศึกษาแล้ว ล้างค่า/ตัวเลือกคณะ + สาขา
           if (state.status !== 'STU') {
             state.facultyId = null;
             const facSel = document.querySelector('select[name="faculty_id"]');
@@ -110,8 +117,40 @@ function createQuestionElement(q) {
 
       optDiv.appendChild(input);
       optDiv.appendChild(
-        document.createTextNode(tLabel(opt.label) || opt.value)
+        document.createTextNode(labelText || opt.value)
       );
+
+      // ถ้าเป็นตัวเลือก "อื่น ๆ" → เพิ่ม textarea ให้กรอก
+      if (isOtherOpt) {
+        const ta = document.createElement('textarea');
+        ta.name = q.id + '_other';
+        ta.className = 'other-text';
+        ta.placeholder =
+          currentLang === 'en' ? 'Please specify' : 'โปรดระบุ';
+        ta.style.display = 'none';
+
+        // เวลาเลือก "อื่น ๆ" → โชว์ textarea, ถ้าเปลี่ยนไปเลือกอย่างอื่น → ซ่อน+เคลียร์
+        input.addEventListener('change', () => {
+          // สำหรับ radio: มีได้แค่ 1 อัน
+          const allOthers = group.querySelectorAll('textarea.other-text');
+          allOthers.forEach(o => {
+            if (o !== ta) {
+              o.style.display = 'none';
+              o.value = '';
+            }
+          });
+
+          if (input.checked) {
+            ta.style.display = '';
+          } else {
+            ta.style.display = 'none';
+            ta.value = '';
+          }
+        });
+
+        optDiv.appendChild(ta);
+      }
+
       group.appendChild(optDiv);
     });
 
@@ -131,10 +170,37 @@ function createQuestionElement(q) {
       input.name = q.id;
       input.value = opt.value;
 
+      const labelText = tLabel(opt.label) || '';
+      const isOtherOpt =
+        (opt.value && opt.value.toLowerCase() === 'other') ||
+        labelText === 'อื่น ๆ' ||
+        labelText.toLowerCase() === 'other';
+
       optDiv.appendChild(input);
       optDiv.appendChild(
-        document.createTextNode(tLabel(opt.label) || opt.value)
+        document.createTextNode(labelText || opt.value)
       );
+
+      if (isOtherOpt) {
+        const ta = document.createElement('textarea');
+        ta.name = q.id + '_other';
+        ta.className = 'other-text';
+        ta.placeholder =
+          currentLang === 'en' ? 'Please specify' : 'โปรดระบุ';
+        ta.style.display = 'none';
+
+        input.addEventListener('change', () => {
+          if (input.checked) {
+            ta.style.display = '';
+          } else {
+            ta.style.display = 'none';
+            ta.value = '';
+          }
+        });
+
+        optDiv.appendChild(ta);
+      }
+
       group.appendChild(optDiv);
     });
 
@@ -216,6 +282,7 @@ function createQuestionElement(q) {
 
   return wrap;
 }
+
 
 
 // ---------- render form ----------
