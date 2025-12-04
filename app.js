@@ -515,9 +515,30 @@ async function submitForm(e) {
 }
 
 
+// ---------- โหลด CONFIG จาก static config.js ----------
+function loadConfigFromStatic() {
+  const statusText = document.getElementById('statusText');
 
-// ---------- โหลด CONFIG จาก Apps Script ----------
-async function loadConfig() {
+  try {
+    if (!window.STATIC_CONFIG || !window.STATIC_CONFIG.config) {
+      throw new Error('STATIC_CONFIG is not defined or invalid');
+    }
+
+    CONFIG = window.STATIC_CONFIG.config;
+    statusText.textContent = '';
+
+    setupLangToggle();
+    renderForm();
+  } catch (err) {
+    console.error(err);
+    statusText.textContent =
+      'โหลดแบบประเมินไม่สำเร็จ (static config) กรุณาตรวจสอบไฟล์ config.js';
+    statusText.classList.add('status-error');
+  }
+}
+
+// ---------- โหลด CONFIG จาก Apps Script (แบบเดิม) ----------
+async function loadConfigFromApi() {
   const statusText = document.getElementById('statusText');
   statusText.textContent = 'กำลังโหลดแบบประเมิน...';
 
@@ -539,11 +560,19 @@ async function loadConfig() {
   }
 }
 
+
 // ---------- init ----------
 document.addEventListener('DOMContentLoaded', () => {
   document
     .getElementById('surveyForm')
     .addEventListener('submit', submitForm);
 
-  loadConfig();
+  const settings = window.APP_SETTINGS || {};
+  const source = settings.configSource || 'api';
+
+  if (source === 'static') {
+    loadConfigFromStatic();
+  } else {
+    loadConfigFromApi();
+  }
 });
